@@ -288,16 +288,18 @@ class SwiftSocket:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
-        started = False
 
-        port = 53000
-        while not started and port < 62000:
-            try:
-                start_server = websockets.serve(self.serve, "localhost", port)
-                self.loop.run_until_complete(start_server)
-                started = True
-            except OSError:
-                port += 1
+        async def initialize_server():
+            started = False
+            port = 53000
+            while not started and port < 62000:
+                try:
+                    server = await websockets.serve(self.serve, "localhost", port)
+                    started = True
+                except OSError:
+                    port += 1
+            return port
+        port = self.loop.run_until_complete(initialize_server())
 
         self.inq.put(port)
         self.loop.run_forever()
@@ -305,7 +307,9 @@ class SwiftSocket:
     async def register(self, websocket):
         self.USERS.add(websocket)
 
-    async def serve(self, websocket, path):
+    async def serve(self, websocket):
+        path = websocket.request.path
+
         # Initial connection handshake
         await self.register(websocket)
         recieved = await websocket.recv()
